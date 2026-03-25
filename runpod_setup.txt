@@ -1,0 +1,39 @@
+RunPod quickstart for PlantVillage inference/training
+
+1) Start a GPU pod
+- Choose a PyTorch image (CUDA 12.x)
+- Open terminal in pod
+
+2) Clone/upload your project
+- git clone <your_repo_url>
+- cd python-ml
+
+3) Create and activate environment
+- python3 -m venv .venv
+- source .venv/bin/activate
+- python -m pip install --upgrade pip
+
+4) Install packages
+- pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+- pip install transformers datasets accelerate scikit-learn pillow timm
+
+5) Keep jobs alive after disconnect
+- tmux new -s train
+- python train_vit.py
+- Detach: Ctrl+B then D
+- Reattach later: tmux attach -t train
+
+6) Generate submission CSV after training
+- python predict_test.py --model-dir vit-model/phase2_finetuned --test-dir data/test --output-csv submission.csv
+
+7) Validate submission before upload
+- python final_submission_check.py --csv submission.csv --test-dir data/test --model-dir vit-model/phase2_finetuned
+
+8) Download output
+- Download submission.csv
+- Download vit-model/phase2_finetuned if needed
+
+Notes
+- If OOM: lower batch size in train_vit.py
+- Always use RGB images for inference (predict_test.py does this automatically)
+- Required CSV header is exactly: image_id,label

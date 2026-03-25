@@ -1,0 +1,10 @@
+# Advanced pack dependencies (install on top of base requirements)
+# torch and torchvision installed separately via setup scripts
+transformers
+datasets
+accelerate
+scikit-learn
+pillow
+timm
+open_clip_torch
+huggingface_hub
