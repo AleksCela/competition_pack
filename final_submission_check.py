@@ -5,7 +5,7 @@ from pathlib import Path
 
 def list_image_ids(test_dir: Path):
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    files = [p.name for p in test_dir.iterdir() if p.is_file() and p.suffix.lower() in exts]
+    files = [p.name for p in test_dir.rglob("*") if p.is_file() and p.suffix.lower() in exts]
     files.sort()
     return files
 
@@ -43,15 +43,15 @@ def main():
         reader = csv.DictReader(f)
         fieldnames = reader.fieldnames or []
 
-        if fieldnames != ["image_id", "label"]:
-            errors.append(f"Header must be exactly: image_id,label. Found: {fieldnames}")
+        if fieldnames != ["id", "label"]:
+            errors.append(f"Header must be exactly: id,label. Found: {fieldnames}")
 
         rows = list(reader)
 
     if not rows:
         errors.append("CSV has no prediction rows.")
 
-    image_ids = [r.get("image_id", "") for r in rows]
+    image_ids = [r.get("id", "") for r in rows]
     labels = [r.get("label", "") for r in rows]
 
     if any(not x for x in image_ids):

@@ -9,7 +9,7 @@ from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 def list_image_files(test_dir: Path):
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    files = [p for p in test_dir.iterdir() if p.is_file() and p.suffix.lower() in exts]
+    files = [p for p in test_dir.rglob("*") if p.is_file() and p.suffix.lower() in exts]
     files.sort(key=lambda p: p.name)
     return files
 
@@ -103,11 +103,11 @@ def main():
 
             for path, pred_id in zip(batch_paths, pred_ids):
                 label = id2label[int(pred_id)]
-                rows.append({"image_id": path.name, "label": label})
+                rows.append({"id": path.name, "label": label})
 
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with output_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["image_id", "label"])
+        writer = csv.DictWriter(f, fieldnames=["id", "label"])
         writer.writeheader()
         writer.writerows(rows)
 

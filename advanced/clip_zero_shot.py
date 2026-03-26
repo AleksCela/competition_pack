@@ -53,6 +53,16 @@ PLANTVILLAGE_CLASSES = [
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
     "Tomato___Tomato_mosaic_virus",
     "Tomato___healthy",
+    "other",
+]
+
+# Custom prompts for the "other" class — not a plant leaf at all
+OTHER_PROMPTS = [
+    "a photo of something that is not a plant",
+    "a random image unrelated to plants or leaves",
+    "a photo of a road, pothole, or urban scene",
+    "an image that is not a crop leaf or plant disease",
+    "a non-plant photograph",
 ]
 
 
@@ -65,9 +75,12 @@ def build_prompts(class_names):
         "a botanical photo showing {}",
         "a leaf affected by {}",
     ]
-    # Also try clean names
     prompts_per_class = {}
     for cls in class_names:
+        if cls == "other":
+            prompts_per_class[cls] = OTHER_PROMPTS
+            continue
+
         clean = cls.replace("___", " ").replace("_", " ").replace("  ", " ").strip()
         parts = clean.split(" ", 1)
         plant = parts[0]
@@ -85,7 +98,7 @@ def build_prompts(class_names):
 
 def list_image_files(test_dir: Path):
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    files = [p for p in test_dir.iterdir() if p.is_file() and p.suffix.lower() in exts]
+    files = [p for p in test_dir.rglob("*") if p.is_file() and p.suffix.lower() in exts]
     files.sort(key=lambda p: p.name)
     return files
 
@@ -164,7 +177,7 @@ def main():
             pred_ids = similarities.argmax(dim=-1).tolist()
 
             for path, pred_id in zip(batch_paths, pred_ids):
-                rows.append({"image_id": path.name, "label": class_names[pred_id]})
+                rows.append({"id": path.name, "label": class_names[pred_id]})
 
             done += len(batch_paths)
             if done % 100 == 0 or done == len(image_paths):
@@ -173,7 +186,7 @@ def main():
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with output_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["image_id", "label"])
+        writer = csv.DictWriter(f, fieldnames=["id", "label"])
         writer.writeheader()
         writer.writerows(rows)
 

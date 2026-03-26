@@ -26,7 +26,7 @@ from transformers import AutoImageProcessor, AutoModelForImageClassification
 def list_image_files(test_dir: Path):
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
     return sorted(
-        [p for p in test_dir.iterdir() if p.is_file() and p.suffix.lower() in exts],
+        [p for p in test_dir.rglob("*") if p.is_file() and p.suffix.lower() in exts],
         key=lambda p: p.name,
     )
 
@@ -148,7 +148,7 @@ def main():
             pred_ids = ensemble_probs.argmax(dim=-1).tolist()
             for path, pid in zip(batch_paths, pred_ids):
                 label = master_id2label[str(pid)] if str(pid) in master_id2label else master_id2label.get(pid, str(pid))
-                rows.append({"image_id": path.name, "label": label})
+                rows.append({"id": path.name, "label": label})
 
             done += len(batch_paths)
             if done % 100 == 0 or done == len(image_paths):
@@ -157,7 +157,7 @@ def main():
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with output_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["image_id", "label"])
+        writer = csv.DictWriter(f, fieldnames=["id", "label"])
         writer.writeheader()
         writer.writerows(rows)
 
