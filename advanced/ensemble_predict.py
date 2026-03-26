@@ -83,6 +83,10 @@ def main():
     parser.add_argument("--test-dir", default="data/test", help="Test images directory")
     parser.add_argument("--output-csv", default="submission_ensemble.csv", help="Output CSV")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size (lower for multiple models in memory)")
+    parser.add_argument(
+        "--ood-threshold", type=float, default=0.0,
+        help="If ensemble max confidence < this, predict 'other'. 0.0 = disabled. Try 0.5.",
+    )
     args = parser.parse_args()
 
     test_dir = Path(args.test_dir)
@@ -122,6 +126,14 @@ def main():
 
     # Use id2label from first model
     master_id2label = models[0][2]
+    other_label = "other"
+    ood_threshold = args.ood_threshold
+    if ood_threshold > 0:
+        if other_label not in {v for v in master_id2label.values()}:
+            print("WARNING: 'other' not in model labels — OOD threshold disabled.")
+            ood_threshold = 0.0
+        else:
+            print(f"OOD threshold: {ood_threshold:.2f}")
 
     rows = []
     done = 0
@@ -145,9 +157,12 @@ def main():
                 else:
                     ensemble_probs = ensemble_probs + probs
 
-            pred_ids = ensemble_probs.argmax(dim=-1).tolist()
-            for path, pid in zip(batch_paths, pred_ids):
-                label = master_id2label[str(pid)] if str(pid) in master_id2label else master_id2label.get(pid, str(pid))
+            max_confs, pred_ids = ensemble_probs.max(dim=-1)
+            for path, pid, confidence in zip(batch_paths, pred_ids.tolist(), max_confs.tolist()):
+                if ood_threshold > 0 and confidence < ood_threshold:
+                    label = other_label
+                else:
+                    label = master_id2label[str(pid)] if str(pid) in master_id2label else master_id2label.get(pid, str(pid))
                 rows.append({"id": path.name, "label": label})
 
             done += len(batch_paths)

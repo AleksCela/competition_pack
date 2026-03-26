@@ -41,16 +41,31 @@ def is_rgb(example, image_col):
         return False
 
 
-TRAIN_AUGMENT = T.Compose([
-    T.RandomResizedCrop(224, scale=(0.8, 1.0)),
-    T.RandomHorizontalFlip(),
-    T.RandomVerticalFlip(),
-    T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05),
-])
+def make_train_augment(crop_size):
+    return T.Compose([
+        T.RandomResizedCrop(crop_size, scale=(0.8, 1.0)),
+        T.RandomHorizontalFlip(),
+        T.RandomVerticalFlip(),
+        T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05),
+    ])
 
 
-def transform_train(batch, processor, image_col):
-    images = [TRAIN_AUGMENT(img) for img in batch[image_col]]
+def get_crop_size(processor):
+    """Read the expected input resolution from the processor config."""
+    for attr in ("size", "crop_size"):
+        val = getattr(processor, attr, None)
+        if val is None:
+            continue
+        if isinstance(val, dict):
+            return val.get("shortest_edge") or val.get("height") or val.get("width") or 224
+        if isinstance(val, int):
+            return val
+    return 224
+
+
+def transform_train(batch, processor, image_col, crop_size):
+    augment = make_train_augment(crop_size)
+    images = [augment(img) for img in batch[image_col]]
     inputs = processor(images, return_tensors="pt")
     batch["pixel_values"] = inputs["pixel_values"]
     return batch
@@ -97,7 +112,7 @@ class WeightedLossTrainer(Trainer):
 
 
 def get_backbone(model):
-    for attr in ["vit", "dinov2", "swinv2", "swin", "base_model"]:
+    for attr in ["vit", "dinov2", "swinv2", "swin", "vision_model", "siglip_vision_model", "base_model"]:
         if hasattr(model, attr):
             return getattr(model, attr)
     return None
@@ -162,7 +177,9 @@ def main():
 
     # Processor + transforms
     processor = AutoImageProcessor.from_pretrained(args.model)
-    train_ds = splits["train"].with_transform(lambda b: transform_train(b, processor, image_col))
+    crop_size = get_crop_size(processor)
+    print(f"Input crop size: {crop_size}px")
+    train_ds = splits["train"].with_transform(lambda b: transform_train(b, processor, image_col, crop_size))
     eval_ds = splits["test"].with_transform(lambda b: transform_eval(b, processor, image_col))
 
     # Build model

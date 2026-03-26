@@ -81,6 +81,11 @@ def main():
     parser.add_argument("--model-type", default="auto", choices=["auto", "hf", "dinov2"],
                         help="Model type (auto-detects from config.json)")
     parser.add_argument("--num-tta", type=int, default=6, help="Number of TTA views (1-6, 1=no TTA)")
+    parser.add_argument(
+        "--ood-threshold", type=float, default=0.0,
+        help="If max softmax confidence < this value, predict 'other' instead. "
+             "0.0 = disabled. Try 0.5 as a starting point.",
+    )
     args = parser.parse_args()
 
     model_dir = Path(args.model_dir)
@@ -111,6 +116,17 @@ def main():
     image_paths = list_image_files(test_dir)
     print(f"Test images: {len(image_paths)}")
 
+    # Find the index for "other" in the label map (needed for OOD fallback)
+    other_label = "other"
+    label2id = {v: k for k, v in (id2label.items() if isinstance(list(id2label.keys())[0], int) else {int(k): v for k, v in id2label.items()}.items())}
+    ood_threshold = args.ood_threshold
+    if ood_threshold > 0:
+        if other_label not in {v for v in id2label.values()}:
+            print(f"WARNING: 'other' class not found in model labels — OOD threshold disabled.")
+            ood_threshold = 0.0
+        else:
+            print(f"OOD threshold: {ood_threshold:.2f} (low-confidence predictions → 'other')")
+
     tta_augs = TTA_TRANSFORMS[:args.num_tta]
 
     rows = []
@@ -138,10 +154,15 @@ def main():
                     avg_probs = avg_probs + probs
 
             avg_probs = avg_probs / len(tta_augs)
-            pred_ids = avg_probs.argmax(dim=-1).tolist()
+            max_confs, pred_ids = avg_probs.max(dim=-1)
+            max_confs = max_confs.tolist()
+            pred_ids = pred_ids.tolist()
 
-            for path, pred_id in zip(batch_paths, pred_ids):
-                label = id2label[str(pred_id)] if str(pred_id) in id2label else id2label.get(pred_id, str(pred_id))
+            for path, pred_id, confidence in zip(batch_paths, pred_ids, max_confs):
+                if ood_threshold > 0 and confidence < ood_threshold:
+                    label = other_label
+                else:
+                    label = id2label[str(pred_id)] if str(pred_id) in id2label else id2label.get(pred_id, str(pred_id))
                 rows.append({"id": path.name, "label": label})
 
             done += len(batch_paths)
