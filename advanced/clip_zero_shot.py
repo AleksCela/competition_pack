@@ -156,6 +156,8 @@ def main():
             prompts = prompts_per_class[cls]
             inputs = processor(text=prompts, return_tensors="pt", padding=True, truncation=True).to(device)
             feats = model.get_text_features(**inputs)
+            if not isinstance(feats, torch.Tensor):
+                feats = feats.pooler_output
             feats = feats / feats.norm(dim=-1, keepdim=True)
             avg_feat = feats.mean(dim=0)
             avg_feat = avg_feat / avg_feat.norm()
@@ -170,6 +172,8 @@ def main():
             images = [Image.open(p).convert("RGB") for p in batch_paths]
             inputs = processor(images=images, return_tensors="pt", padding=True).to(device)
             image_features = model.get_image_features(**inputs)
+            if not isinstance(image_features, torch.Tensor):
+                image_features = image_features.pooler_output
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
             # Cosine similarity
